@@ -3,96 +3,72 @@
 -- Run this ONCE in Supabase Dashboard > SQL Editor
 -- =============================================
 
--- 1. Create tables
-create table if not exists public.guests (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text unique not null,
-  unique_code text unique not null default encode(gen_random_bytes(8), 'hex'),
-  created_at timestamp with time zone default now()
-);
-
+-- 1. Resenhas (events)
 create table if not exists public.resenhas (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   description text,
   date date not null,
+  end_date date,
   time time not null,
   location text not null,
   cover_image_url text,
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  share_code text unique not null default encode(gen_random_bytes(4), 'hex'),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
-create table if not exists public.invites (
+-- 2. Collections (groups of resenhas)
+create table if not exists public.collections (
   id uuid primary key default gen_random_uuid(),
-  guest_id uuid not null references public.guests(id) on delete cascade,
-  resenha_id uuid not null references public.resenhas(id) on delete cascade,
-  status text not null default 'pending' check (status in ('pending', 'sent', 'viewed', 'confirmed', 'declined')),
-  sent_at timestamp with time zone,
-  viewed_at timestamp with time zone,
-  confirmed_at timestamp with time zone,
-  created_at timestamp with time zone default now(),
-  unique(guest_id, resenha_id)
+  title text not null,
+  description text,
+  share_code text unique not null default encode(gen_random_bytes(4), 'hex'),
+  created_at timestamptz default now()
 );
 
--- 2. Enable Row Level Security
-alter table public.guests enable row level security;
+-- 3. Collection <-> Resenha join
+create table if not exists public.collection_resenhas (
+  id uuid primary key default gen_random_uuid(),
+  collection_id uuid not null references public.collections(id) on delete cascade,
+  resenha_id uuid not null references public.resenhas(id) on delete cascade,
+  unique(collection_id, resenha_id)
+);
+
+-- 4. Responses (RSVP + comments)
+create table if not exists public.responses (
+  id uuid primary key default gen_random_uuid(),
+  resenha_id uuid not null references public.resenhas(id) on delete cascade,
+  name text not null,
+  status text not null check (status in ('confirmed', 'declined')),
+  comment text,
+  created_at timestamptz default now()
+);
+
+-- 5. Enable RLS
 alter table public.resenhas enable row level security;
-alter table public.invites enable row level security;
+alter table public.collections enable row level security;
+alter table public.collection_resenhas enable row level security;
+alter table public.responses enable row level security;
 
--- 3. RLS Policies for GUESTS table
--- Authenticated users (admin) can do everything
-create policy "Admin full access to guests"
-  on public.guests for all
-  to authenticated
-  using (true)
-  with check (true);
+-- 6. RLS Policies
+create policy "Admin full access to resenhas" on public.resenhas for all to authenticated using (true) with check (true);
+create policy "Public can read resenhas" on public.resenhas for select to anon using (true);
 
--- Public can read guests (needed for invite page lookup by code)
-create policy "Public can read guests"
-  on public.guests for select
-  to anon
-  using (true);
+create policy "Admin full access to collections" on public.collections for all to authenticated using (true) with check (true);
+create policy "Public can read collections" on public.collections for select to anon using (true);
 
--- 4. RLS Policies for RESENHAS table
--- Authenticated users (admin) can do everything
-create policy "Admin full access to resenhas"
-  on public.resenhas for all
-  to authenticated
-  using (true)
-  with check (true);
+create policy "Admin full access to collection_resenhas" on public.collection_resenhas for all to authenticated using (true) with check (true);
+create policy "Public can read collection_resenhas" on public.collection_resenhas for select to anon using (true);
 
--- Public can read resenhas (needed for invite page)
-create policy "Public can read resenhas"
-  on public.resenhas for select
-  to anon
-  using (true);
+create policy "Admin full access to responses" on public.responses for all to authenticated using (true) with check (true);
+create policy "Public can read responses" on public.responses for select to anon using (true);
+create policy "Public can create responses" on public.responses for insert to anon with check (true);
 
--- 5. RLS Policies for INVITES table
--- Authenticated users (admin) can do everything
-create policy "Admin full access to invites"
-  on public.invites for all
-  to authenticated
-  using (true)
-  with check (true);
-
--- Public can read invites (needed for invite page)
-create policy "Public can read invites"
-  on public.invites for select
-  to anon
-  using (true);
-
--- Public can update invites (needed for RSVP confirm/decline)
-create policy "Public can update invite status"
-  on public.invites for update
-  to anon
-  using (true)
-  with check (true);
-
--- 6. Indexes for performance
-create index if not exists idx_guests_unique_code on public.guests(unique_code);
-create index if not exists idx_invites_guest_id on public.invites(guest_id);
-create index if not exists idx_invites_resenha_id on public.invites(resenha_id);
-create index if not exists idx_invites_status on public.invites(status);
+-- 7. Indexes
+create index if not exists idx_resenhas_share_code on public.resenhas(share_code);
 create index if not exists idx_resenhas_date on public.resenhas(date);
+create index if not exists idx_collections_share_code on public.collections(share_code);
+create index if not exists idx_collection_resenhas_collection on public.collection_resenhas(collection_id);
+create index if not exists idx_collection_resenhas_resenha on public.collection_resenhas(resenha_id);
+create index if not exists idx_responses_resenha on public.responses(resenha_id);
