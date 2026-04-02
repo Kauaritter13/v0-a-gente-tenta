@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Calendar, MapPin, Trash2 } from "lucide-react"
+import { ArrowLeft, Calendar } from "lucide-react"
 import { ShareLink } from "../../resenhas/[id]/share-link"
 import { CollectionActions } from "./actions"
+import { ManageResenhas } from "./manage-resenhas"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -37,6 +37,12 @@ export default async function ColecaoDetailPage({ params }: PageProps) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resenhas = links?.map((l: any) => l.resenha).filter(Boolean) || []
+  const currentResenhaIds: string[] = resenhas.map((r: any) => r.id)
+
+  const { data: allResenhas } = await supabase
+    .from("resenhas")
+    .select("id, title, date, location")
+    .order("date", { ascending: false })
 
   return (
     <div className="p-6 lg:p-8">
@@ -56,9 +62,16 @@ export default async function ColecaoDetailPage({ params }: PageProps) {
       <ShareLink shareCode={`colecao/${collection.share_code}`} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Resenhas nesta colecao ({resenhas.length})</CardTitle>
-          <CardDescription>Todas serao exibidas quando alguem acessar o link</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Resenhas nesta colecao ({resenhas.length})</CardTitle>
+            <CardDescription>Todas serao exibidas quando alguem acessar o link</CardDescription>
+          </div>
+          <ManageResenhas
+            collectionId={collection.id}
+            allResenhas={allResenhas || []}
+            currentResenhaIds={currentResenhaIds}
+          />
         </CardHeader>
         <CardContent>
           {resenhas.length > 0 ? (
@@ -78,7 +91,7 @@ export default async function ColecaoDetailPage({ params }: PageProps) {
               ))}
             </div>
           ) : (
-            <p className="text-center py-8 text-muted-foreground">Nenhuma resenha adicionada</p>
+            <p className="text-center py-8 text-muted-foreground">Nenhuma resenha adicionada. Clique em "Gerenciar" para adicionar.</p>
           )}
         </CardContent>
       </Card>
