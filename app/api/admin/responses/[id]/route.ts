@@ -12,28 +12,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      return NextResponse.json({ error: "Nao autorizado" }, { status: 401 })
     }
 
-    const { error } = await supabase
-      .from("guests")
-      .delete()
-      .eq("id", id)
+    const { error } = await supabase.from("responses").delete().eq("id", id)
 
     if (error) {
-      console.error("Error deleting guest:", error)
-      return NextResponse.json(
-        { error: "Erro ao excluir convidado" },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: "Erro ao excluir resposta" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error in delete guest:", error)
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 })
   }
 }
